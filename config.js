@@ -52,11 +52,11 @@ export class Config {
             // Provider selection
             provider: "nightscout", // "nightscout" or "librelink"
             
-            // Nightscout config (existing)
+            // Nightscout config
             nightscoutUrl: "",
             apiToken: "",
             
-            // LibreLink config (new)
+            // LibreLink config
             librelink: {
                 email: "",
                 password: "",
@@ -64,13 +64,12 @@ export class Config {
                 patientId: "" // auto-detected after first login
             },
             
-            // Rest of existing config unchanged
-            units: "mmol/L",
+            units: "mg/dL",
             graphHours: 6,
             debug: false,
             thresholds: {
-                low: 4.0,        // mmol/L - below this is low
-                high: 10.0,      // mmol/L - above this is high
+                low: 70,
+                high: 180,
             },
             notifications: {
                 enabled: true,
