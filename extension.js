@@ -150,13 +150,13 @@ class MyExtension extends PanelMenu.Button {
     }
     
     _initializeConfig() {
-        this._debugEnabled = this._config.get('debug');
+        this._debugEnabled = this._config.get('debug') || false; // Change: add || false
         this._log('Initializing config...');
 
         // Nightscout config from file
         this._nightscoutUrl = this._config.get('nightscoutUrl');
         this._token = this._config.get('apiToken');
-        this._units = this._config.get('units') || 'mmol/L';
+        this._units = this._config.get('units') || 'mg/dL';
         this._graphHours = this._config.get('graphHours') || 6;
         this._cgmInterval = CONSTANTS.DEFAULT_CGM_INTERVAL;
         this._historyFetchInterval = this._config.get('historyFetchInterval') || 10;
@@ -490,6 +490,23 @@ class MyExtension extends PanelMenu.Button {
         
         this._graph.setData(displayData);
         this._updateTimeInRange();
+    }
+
+    _updateHistory(entries) {
+        if (!entries || !Array.isArray(entries)) {
+            this._log('Invalid history data received');
+            return;
+        }
+
+        this._rawHistoryEntries = entries;
+        this._cgmInterval = this._provider.getCgmInterval();
+
+        // Save to on-disk cache
+        const cachedData = this._cache.load() || {};
+        cachedData.history = entries;
+        this._cache.save(cachedData);
+
+        this._reprocessHistory();
     }
 
     _updateBG(entry) {
