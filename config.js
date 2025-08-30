@@ -26,6 +26,11 @@ export class Config {
                 const defaultConfig = this._getDefaultConfig();
                 const userConfig = JSON.parse(configText);
 
+                // Clean up obsolete 'units' property
+                if (userConfig.units) {
+                    delete userConfig.units;
+                }
+
                 // Deep merge for nested objects to preserve old settings
                 if (userConfig.thresholds) {
                     userConfig.thresholds = { ...defaultConfig.thresholds, ...userConfig.thresholds };
@@ -64,7 +69,6 @@ export class Config {
                 patientId: "" // auto-detected after first login
             },
             
-            units: "mg/dL",
             graphHours: 6,
             debug: false,
             thresholds: {
