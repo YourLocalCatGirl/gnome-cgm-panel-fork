@@ -26,9 +26,13 @@ export class Config {
                 const defaultConfig = this._getDefaultConfig();
                 const userConfig = JSON.parse(configText);
 
-                // Clean up obsolete 'units' property
-                if (userConfig.units) {
-                    delete userConfig.units;
+                // Backward compatibility for old configs
+                if (!userConfig.units && userConfig.thresholds && userConfig.thresholds.high < 30) {
+                    // If units is missing and high threshold is low, assume mmol/L
+                    userConfig.units = "mmol/L";
+                    // Convert thresholds to mg/dL for internal use
+                    userConfig.thresholds.low = Math.round(userConfig.thresholds.low * 18);
+                    userConfig.thresholds.high = Math.round(userConfig.thresholds.high * 18);
                 }
 
                 // Deep merge for nested objects to preserve old settings
@@ -71,6 +75,7 @@ export class Config {
             
             graphHours: 6,
             debug: false,
+            units: "mg/dL", // "mg/dL" or "mmol/L"
             thresholds: {
                 low: 70,
                 high: 180,

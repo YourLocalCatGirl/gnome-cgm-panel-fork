@@ -10,13 +10,14 @@ const DEFAULT_COLORS = {
 };
 
 export class CGMGraph {
-    constructor(width = 300, height = 150, thresholds = null, graphHours = 6, colors = {}, debugLog = () => {}) {
+    constructor(width = 300, height = 150, thresholds = null, graphHours = 6, colors = {}, units = 'mg/dL', debugLog = () => {}) {
         this.width = width;
         this.height = height;
         this.padding = { top: 20, right: 20, bottom: 30, left: 40 };
         this.data = [];
-        this.thresholds = thresholds || { low: 4.0, high: 10.0 };
+        this.thresholds = thresholds || { low: 70, high: 180 };
         this.graphHours = graphHours;
+        this.units = units;
         this.cgmInterval = 1;
         this.log = debugLog;
 
@@ -95,6 +96,11 @@ export class CGMGraph {
         this.graphHours = graphHours;
         this.drawingArea.queue_repaint();
     }
+
+    setUnits(units) {
+        this.units = units;
+        this.drawingArea.queue_repaint();
+    }
     
     setData(dataPoints) {
         // dataPoints should be array of {time: Date, value: number}
@@ -133,17 +139,31 @@ export class CGMGraph {
         let chartWidth = width - this.padding.left - this.padding.right;
         let chartHeight = height - this.padding.top - this.padding.bottom;
         
-        // Calculate Y-axis scale: always start at 0, go up to a nice round number
+        // Calculate Y-axis scale
         let values = this.data.map(d => d.value);
-        let maxDataValue = Math.max(...values);
-        let minValue = 0; // Always start at 0
-        
-        // Determine a preliminary max value, at least 15
-        let preliminaryMaxValue = Math.max(15, maxDataValue + 1);
-        
-        // Round up to the next nice number for the grid (a multiple of 6, since we have 6 grid lines)
-        let maxValue = Math.ceil(preliminaryMaxValue / 6) * 6;
+        let maxDataValue = values.length > 0 ? Math.max(...values) : (this.units === 'mmol/L' ? 15 : 270);
+        let minValue = 0;
+
+        let maxValue;
+        if (this.units === 'mmol/L') {
+            const maxDataMmol = maxDataValue / 18;
+            maxValue = Math.ceil(Math.max(12, maxDataMmol + 1) / 3) * 3; // Round up to next multiple of 3
+        } else {
+            maxValue = Math.ceil(Math.max(200, maxDataValue + 20) / 50) * 50; // Round up to next multiple of 50
+        }
         let valueRange = maxValue - minValue;
+
+        // Convert data for drawing if units are mmol/L
+        const drawData = this.data.map(d => ({
+            ...d,
+            value: this.units === 'mmol/L' ? d.value / 18 : d.value
+        }));
+
+        // Convert thresholds for drawing
+        const drawThresholds = {
+            low: this.units === 'mmol/L' ? this.thresholds.low / 18 : this.thresholds.low,
+            high: this.units === 'mmol/L' ? this.thresholds.high / 18 : this.thresholds.high
+        };
         
         // Time range - calculate the full time window we want to show
         let now = new Date();
@@ -153,28 +173,31 @@ export class CGMGraph {
         // Draw grid lines first
         this._drawGrid(cr, chartWidth, chartHeight, minValue, maxValue, startTime, now);
         
+        // Draw threshold lines
+        this._drawThresholdLines(cr, chartWidth, chartHeight, minValue, valueRange, drawThresholds);
+        
         // Draw the line with colors
-        this._drawColoredLine(cr, chartWidth, chartHeight, minValue, valueRange, startTime, timeRange);
+        this._drawColoredLine(cr, drawData, chartWidth, chartHeight, minValue, valueRange, startTime, timeRange, drawThresholds);
         
         // Draw axes labels
         this._drawLabels(cr, width, height, minValue, maxValue, startTime, now);
     }
     
-    _getColorForValue(value) {
-        if (value < this.thresholds.low) {
+    _getColorForValue(value, thresholds) {
+        if (value < thresholds.low) {
             return this.parsedColors.low;
-        } else if (value > this.thresholds.high) {
+        } else if (value > thresholds.high) {
             return this.parsedColors.high;
         } else {
             return this.parsedColors.normal;
         }
     }
     
-    _drawColoredLine(cr, chartWidth, chartHeight, minValue, valueRange, startTime, timeRange) {
-        if (this.data.length < 2) {
+    _drawColoredLine(cr, data, chartWidth, chartHeight, minValue, valueRange, startTime, timeRange, thresholds) {
+        if (data.length < 2) {
             // If we only have one point, draw it as a dot
-            if (this.data.length === 1) {
-                this._drawSinglePoint(cr, chartWidth, chartHeight, minValue, valueRange, startTime, timeRange);
+            if (data.length === 1) {
+                this._drawSinglePoint(cr, data[0], chartWidth, chartHeight, minValue, valueRange, startTime, timeRange, thresholds);
             }
             return;
         }
@@ -182,9 +205,9 @@ export class CGMGraph {
         cr.setLineWidth(2);
         
         // Draw line segments with appropriate colors
-        for (let i = 0; i < this.data.length - 1; i++) {
-            let currentPoint = this.data[i];
-            let nextPoint = this.data[i + 1];
+        for (let i = 0; i < data.length - 1; i++) {
+            let currentPoint = data[i];
+            let nextPoint = data[i + 1];
             
             // Calculate time differences from start time
             let currentTimeDiff = currentPoint.time - startTime;
@@ -203,7 +226,7 @@ export class CGMGraph {
             }
 
             // Use the color of the current point for this segment
-            let color = this._getColorForValue(currentPoint.value);
+            let color = this._getColorForValue(currentPoint.value, thresholds);
             cr.setSourceRGB(color[0], color[1], color[2]);
             
             // Calculate positions relative to the full time window
@@ -227,15 +250,14 @@ export class CGMGraph {
         }
     }
 
-    _drawSinglePoint(cr, chartWidth, chartHeight, minValue, valueRange, startTime, timeRange) {
-        let point = this.data[0];
+    _drawSinglePoint(cr, point, chartWidth, chartHeight, minValue, valueRange, startTime, timeRange, thresholds) {
         let timeDiff = point.time - startTime;
         
         if (timeDiff < 0 || timeDiff > timeRange) {
             return; // Point is outside visible range
         }
         
-        let color = this._getColorForValue(point.value);
+        let color = this._getColorForValue(point.value, thresholds);
         cr.setSourceRGB(color[0], color[1], color[2]);
         
         let x = this.padding.left + (timeDiff / timeRange * chartWidth);
@@ -283,12 +305,9 @@ export class CGMGraph {
             cr.lineTo(x, this.padding.top + chartHeight);
             cr.stroke();
         }
-        
-        // Draw threshold lines
-        this._drawThresholdLines(cr, chartWidth, chartHeight, minValue, maxValue - minValue);
     }
     
-    _drawThresholdLines(cr, chartWidth, chartHeight, minValue, valueRange) {
+    _drawThresholdLines(cr, chartWidth, chartHeight, minValue, valueRange, thresholds) {
         cr.setLineWidth(0.8);
 
         const drawLine = (value, color) => {
@@ -305,8 +324,8 @@ export class CGMGraph {
             }
         };
 
-        drawLine(this.thresholds.low, this.parsedColors.low);
-        drawLine(this.thresholds.high, this.parsedColors.high);
+        drawLine(thresholds.low, this.parsedColors.low);
+        drawLine(thresholds.high, this.parsedColors.high);
     }
     
     _drawLabels(cr, width, height, minValue, maxValue, startTime, endTime) {
@@ -314,17 +333,17 @@ export class CGMGraph {
         cr.selectFontFace('Sans', 0, 0);
         cr.setFontSize(10);
         
-        // Y-axis labels (glucose values) - now always starts at 0
+        // Y-axis labels (glucose values)
         let valueStep = (maxValue - minValue) / 6;
         for (let i = 0; i <= 6; i++) {
             let value = minValue + (valueStep * (6 - i));
 
             // Don't draw the label for 0.0 to make the graph look friendlier
-            if (value < 0.1) {
+            if (this.units === 'mmol/L' && value < 0.1) {
                 continue;
             }
 
-            let text = value.toFixed(1);
+            let text = this.units === 'mmol/L' ? value.toFixed(1) : value.toFixed(0);
             let y = this.padding.top + (height - this.padding.top - this.padding.bottom) * i / 6;
             
             let textExtents = cr.textExtents(text);

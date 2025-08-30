@@ -212,8 +212,9 @@ class MyExtension extends PanelMenu.Button {
     _createGraph() {
         let thresholds = this._config.get('thresholds');
         let colors = this._config.get('colors');
+        let units = this._config.get('units');
         
-        this._graph = new CGMGraph(320, 180, thresholds, this._graphHours, colors, this._log.bind(this));
+        this._graph = new CGMGraph(320, 180, thresholds, this._graphHours, colors, units, this._log.bind(this));
     }
     
     _setupEventHandlers() {
@@ -265,14 +266,25 @@ class MyExtension extends PanelMenu.Button {
         const oldUrl = this._nightscoutUrl;
         const oldToken = this._token;
         const oldProvider = this._config.get('provider') || 'nightscout';
+        const oldUnits = this._config.get('units') || 'mg/dL';
         
         this._config.reload();
         this._debugEnabled = this._config.get('debug');
         this._initializeConfig();
         
         const newProvider = this._config.get('provider') || 'nightscout';
+        const newUnits = this._config.get('units') || 'mg/dL';
         const providerChanged = (oldProvider !== newProvider);
         const urlOrCredentialsChanged = (oldUrl !== this._nightscoutUrl || oldToken !== this._token);
+        const unitsChanged = (oldUnits !== newUnits);
+
+        if (this._graph) {
+            this._graph.setThresholds(this._config.get('thresholds'));
+            this._graph.setColors(this._config.get('colors'));
+            if (unitsChanged) {
+                this._graph.setUnits(newUnits);
+            }
+        }
         
         // If provider changed, destroy old one and create new one
         if (providerChanged) {
@@ -493,11 +505,12 @@ class MyExtension extends PanelMenu.Button {
         let trendArrow = this._calculateTrend();
         let delta = this._calculateDelta();
         let deltaText = this._formatDelta(delta);
+        const units = this._config.get('units') || 'mg/dL';
         
         this._label.set_text(`${CONSTANTS.PANEL_LABEL_PREFIX}${displayValue}${trendArrow ? ' ' + trendArrow : ''}`);
         
         if (this._bgLabel) {
-            this._bgLabel.set_text(`${displayValue} mg/dL${trendArrow ? ' ' + trendArrow : ''}`);
+            this._bgLabel.set_text(`${displayValue} ${units}${trendArrow ? ' ' + trendArrow : ''}`);
         }
         if (this._timeLabel && this._lastUpdate) {
             this._timeLabel.set_text(`Updated: ${this._lastUpdate.toLocaleTimeString([], { hourCycle: 'h23' })}`);
@@ -515,6 +528,11 @@ class MyExtension extends PanelMenu.Button {
     
     _getDisplayValue() {
         if (!this._currentBG) return '--';
+        
+        const units = this._config.get('units');
+        if (units === 'mmol/L') {
+            return (this._currentBG / 18).toFixed(1);
+        }
         return this._currentBG.toString();
     }
     
@@ -578,15 +596,16 @@ class MyExtension extends PanelMenu.Button {
         if (!notifications.enabled) return;
 
         const thresholds = this._config.get('thresholds');
+        const units = this._config.get('units') || 'mg/dL';
         let currentState = 'normal';
         let message = '';
 
         if (newBG < thresholds.low) {
             currentState = 'low';
-            if (notifications.low) message = `Low Glucose: ${this._getDisplayValue()} mg/dL`;
+            if (notifications.low) message = `Low Glucose: ${this._getDisplayValue()} ${units}`;
         } else if (newBG > thresholds.high) {
             currentState = 'high';
-            if (notifications.high) message = `High Glucose: ${this._getDisplayValue()} mg/dL`;
+            if (notifications.high) message = `High Glucose: ${this._getDisplayValue()} ${units}`;
         }
 
         // Send notification only when state changes to low/high
@@ -748,9 +767,15 @@ class MyExtension extends PanelMenu.Button {
     _formatDelta(delta) {
         if (!delta) return '';
         
-        let sign = delta.value >= 0 ? '+' : '';
-        let value = Math.abs(delta.value);
-        let formattedValue = Math.round(value).toString();
+        const units = this._config.get('units');
+        let value = delta.value;
+
+        if (units === 'mmol/L') {
+            value = (value / 18);
+        }
+
+        let sign = value >= 0 ? '+' : '';
+        let formattedValue = units === 'mmol/L' ? value.toFixed(1) : Math.round(value).toString();
         
         return `${sign}${formattedValue} (${delta.minutes}min)`;
     }

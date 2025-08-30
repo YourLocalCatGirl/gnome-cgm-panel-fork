@@ -1,0 +1,30 @@
+{
+  "provider": "nightscout",
+  "nightscoutUrl": "https://bram.nightscout.bramgn.nl",
+  "apiToken": "gnomecgmwi-fc82663eb5ae7c95",
+  "librelink": {
+    "email": "bram@ampersand.no",
+    "password": "orT*dO1a;g0f",
+    "region": "EU",
+    "patientId": "9b47d77e-74f1-11ef-932d-a2ba0cfe912d"
+  },
+  "units": "mmol/L",
+  "graphHours": 6,
+  "debug": false,
+  "thresholds": {
+    "low": 4,
+    "high": 9.5
+  },
+  "notifications": {
+    "enabled": true,
+    "low": true,
+    "high": true
+  },
+  "colors": {
+    "low": "#ff4444",
+    "high": "#ffaa00",
+    "normal": "#ffffff"
+  },
+  "staleMinutes": 10,
+  "historyFetchInterval": 5
+}
