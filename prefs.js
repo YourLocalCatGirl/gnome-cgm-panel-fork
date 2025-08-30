@@ -145,8 +145,8 @@ export default class CGMPreferences extends ExtensionPreferences {
                         try {
                             const data = JSON.parse(response);
                             if (data && data.length > 0) {
-                                const glucose = formatGlucoseValue(data[0].sgv, config.get('units') || 'mmol/L');
-                                const units = config.get('units') || 'mmol/L';
+                                const glucose = formatGlucoseValue(data[0].sgv, config.get('units') || 'mg/dL');
+                                const units = config.get('units') || 'mg/dL';
                                 showToast(window, `✓ Connected! Latest: ${glucose} ${units}`);
                             } else {
                                 showToast(window, '⚠ Connected but no data found');
@@ -263,8 +263,8 @@ export default class CGMPreferences extends ExtensionPreferences {
                 provider.fetchCurrent()
                     .then(data => {
                         if (data && data.sgv) {
-                            const glucose = formatGlucoseValue(data.sgv, config.get('units') || 'mmol/L');
-                            const units = config.get('units') || 'mmol/L';
+                            const glucose = formatGlucoseValue(data.sgv, config.get('units') || 'mg/dL');
+                            const units = config.get('units') || 'mg/dL';
                             const timestamp = new Date(data.dateString).toLocaleTimeString();
                             showToast(window, `✓ LibreLink Connected! Latest: ${glucose} ${units} at ${timestamp}`);
                         } else {
@@ -311,7 +311,7 @@ export default class CGMPreferences extends ExtensionPreferences {
         });
         page.add(thresholdGroup);
 
-        const currentUnits = config.get('units') || 'mmol/L';
+        const currentUnits = config.get('units') || 'mg/dL';
         const isMmol = currentUnits === 'mmol/L';
 
         // Low threshold
