@@ -305,6 +305,9 @@ class MyExtension extends PanelMenu.Button {
             this._inMemoryCache = {};
             this._fetchBG();
             this._fetchHistory();
+        } else if (unitsChanged) {
+            // If only units changed, just update the display
+            this._updateBGDisplay();
         }
     }
 
