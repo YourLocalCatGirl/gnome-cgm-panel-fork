@@ -26,21 +26,17 @@ export class Config {
                 const defaultConfig = this._getDefaultConfig();
                 const userConfig = JSON.parse(configText);
 
-                // Backward compatibility for old configs
-                if (!userConfig.units && userConfig.thresholds && userConfig.thresholds.high < 30) {
-                    // If units is missing and high threshold is low, assume mmol/L
-                    userConfig.units = "mmol/L";
-                    // Convert thresholds to mg/dL and save the updated config
-                    userConfig.thresholds.low = Math.round(userConfig.thresholds.low * 18);
-                    userConfig.thresholds.high = Math.round(userConfig.thresholds.high * 18);
-                    const newConfig = { ...defaultConfig, ...userConfig };
-                    this._saveConfig(newConfig);
-                    this._config = newConfig;
+                const mergedConfig = { ...defaultConfig, ...userConfig };
+
+                // If units are in mmol/L, convert thresholds to mg/dL for internal use
+                if (mergedConfig.units === 'mmol/L') {
+                    mergedConfig.thresholds.low = Math.round(mergedConfig.thresholds.low * 18);
+                    mergedConfig.thresholds.high = Math.round(mergedConfig.thresholds.high * 18);
                 }
 
                 // Deep merge for nested objects to preserve old settings
                 if (userConfig.thresholds) {
-                    userConfig.thresholds = { ...defaultConfig.thresholds, ...userConfig.thresholds };
+                    mergedConfig.thresholds = { ...defaultConfig.thresholds, ...mergedConfig.thresholds };
                 }
                 if (userConfig.notifications) {
                     userConfig.notifications = { ...defaultConfig.notifications, ...userConfig.notifications };
@@ -118,6 +114,14 @@ export class Config {
     }
 
     _saveConfig(configObject) {
+        let configToSave = JSON.parse(JSON.stringify(configObject)); // Deep copy
+
+        // If units are in mmol/L, convert thresholds back for saving
+        if (configToSave.units === 'mmol/L') {
+            configToSave.thresholds.low = (configToSave.thresholds.low / 18).toFixed(1);
+            configToSave.thresholds.high = (configToSave.thresholds.high / 18).toFixed(1);
+        }
+
         try {
             const dir = Gio.File.new_for_path(this.configDir);
             if (!dir.query_exists(null)) {
@@ -125,7 +129,7 @@ export class Config {
             }
 
             const file = Gio.File.new_for_path(this.configFile);
-            const configJson = JSON.stringify(configObject, null, 2);
+            const configJson = JSON.stringify(configToSave, null, 2);
             file.replace_contents(configJson, null, false, Gio.FileCreateFlags.NONE, null);
         } catch (error) {
             console.error('Error saving CGM config:', error);
