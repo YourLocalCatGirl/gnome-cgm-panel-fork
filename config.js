@@ -30,9 +30,12 @@ export class Config {
                 if (!userConfig.units && userConfig.thresholds && userConfig.thresholds.high < 30) {
                     // If units is missing and high threshold is low, assume mmol/L
                     userConfig.units = "mmol/L";
-                    // Convert thresholds to mg/dL for internal use
+                    // Convert thresholds to mg/dL and save the updated config
                     userConfig.thresholds.low = Math.round(userConfig.thresholds.low * 18);
                     userConfig.thresholds.high = Math.round(userConfig.thresholds.high * 18);
+                    const newConfig = { ...defaultConfig, ...userConfig };
+                    this._saveConfig(newConfig);
+                    this._config = newConfig;
                 }
 
                 // Deep merge for nested objects to preserve old settings

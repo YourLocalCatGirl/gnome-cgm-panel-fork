@@ -315,7 +315,6 @@ export default class CGMPreferences extends ExtensionPreferences {
         // Glucose thresholds group
         const thresholdGroup = new Adw.PreferencesGroup({
             title: _('Glucose Thresholds'),
-            description: _('Configure glucose level thresholds for color coding (mg/dL)'),
         });
         page.add(thresholdGroup);
 
@@ -334,74 +333,6 @@ export default class CGMPreferences extends ExtensionPreferences {
             digits: 1,
         });
         thresholdGroup.add(highRow);
-
-        const updateThresholdsUI = (units) => {
-            const isMmol = units === 'mmol/L';
-            const conversionFactor = 18;
-
-            let lowValue, highValue;
-            if (isMmol) {
-                lowValue = (config.get('thresholds').low / conversionFactor).toFixed(1);
-                highValue = (config.get('thresholds').high / conversionFactor).toFixed(1);
-            } else {
-                lowValue = config.get('thresholds').low;
-                highValue = config.get('thresholds').high;
-            }
-            
-            lowRow.subtitle = _(`Values below this will be colored red (${units})`);
-            lowRow.adjustment = new Gtk.Adjustment({
-                lower: isMmol ? 2.0 : 36,
-                upper: isMmol ? 6.0 : 108,
-                step_increment: isMmol ? 0.1 : 1,
-                page_increment: isMmol ? 0.5 : 9,
-                value: lowValue,
-            });
-            lowRow.digits = isMmol ? 1 : 0;
-
-            highRow.subtitle = _(`Values above this will be colored orange (${units})`);
-            highRow.adjustment = new Gtk.Adjustment({
-                lower: isMmol ? 6.0 : 108,
-                upper: isMmol ? 15.0 : 270,
-                step_increment: isMmol ? 0.1 : 1,
-                page_increment: isMmol ? 0.5 : 9,
-                value: highValue,
-            });
-            highRow.digits = isMmol ? 1 : 0;
-        };
-        
-        unitsRow.connect('notify::selected', () => {
-            const newUnits = unitsRow.selected === 0 ? 'mg/dL' : 'mmol/L';
-            config.set('units', newUnits);
-
-            // When changing units, reset thresholds to default values
-            const isMmol = newUnits === 'mmol/L';
-            let thresholds = config.get('thresholds');
-            if (isMmol) {
-                thresholds.low = 72; // 4.0 mmol/L
-                thresholds.high = 180; // 10.0 mmol/L
-            } else {
-                thresholds.low = 70;
-                thresholds.high = 180;
-            }
-            config.set('thresholds', thresholds);
-
-            updateThresholdsUI(newUnits);
-        });
-
-        // Initial UI setup
-        updateThresholdsUI(currentUnits);
-
-        // Connect threshold change events
-        lowRow.connect('changed', () => {
-            let thresholds = config.get('thresholds');
-            thresholds.low = lowRow.value;
-            config.set('thresholds', thresholds);
-        });
-        highRow.connect('changed', () => {
-            let thresholds = config.get('thresholds');
-            thresholds.high = highRow.value;
-            config.set('thresholds', thresholds);
-        });
 
         // Display settings group
         const displayGroup = new Adw.PreferencesGroup({
@@ -449,6 +380,78 @@ export default class CGMPreferences extends ExtensionPreferences {
         unitsRow.selected = currentUnits === 'mg/dL' ? 0 : 1;
 
         displayGroup.add(unitsRow);
+
+        const updateThresholdsUI = (units) => {
+            const isMmol = units === 'mmol/L';
+            const conversionFactor = 18;
+
+            let lowValue, highValue;
+            if (isMmol) {
+                lowValue = (config.get('thresholds').low / conversionFactor).toFixed(1);
+                highValue = (config.get('thresholds').high / conversionFactor).toFixed(1);
+            } else {
+                lowValue = config.get('thresholds').low;
+                highValue = config.get('thresholds').high;
+            }
+            
+            lowRow.subtitle = _(`Values below this will be colored red (${units})`);
+            lowRow.adjustment = new Gtk.Adjustment({
+                lower: isMmol ? 2.0 : 36,
+                upper: isMmol ? 6.0 : 108,
+                step_increment: isMmol ? 0.1 : 1,
+                page_increment: isMmol ? 0.5 : 9,
+                value: lowValue,
+            });
+            lowRow.digits = isMmol ? 1 : 0;
+
+            highRow.subtitle = _(`Values above this will be colored orange (${units})`);
+            highRow.adjustment = new Gtk.Adjustment({
+                lower: isMmol ? 6.0 : 108,
+                upper: isMmol ? 15.0 : 270,
+                step_increment: isMmol ? 0.1 : 1,
+                page_increment: isMmol ? 0.5 : 9,
+                value: highValue,
+            });
+            highRow.digits = isMmol ? 1 : 0;
+
+            thresholdGroup.description = _(`Configure glucose level thresholds for color coding (${units})`);
+        };
+        
+        unitsRow.connect('notify::selected', () => {
+            const newUnits = unitsRow.selected === 0 ? 'mg/dL' : 'mmol/L';
+            config.set('units', newUnits);
+
+            // When changing units, reset thresholds to default values
+            const isMmol = newUnits === 'mmol/L';
+            let thresholds = config.get('thresholds');
+            if (isMmol) {
+                thresholds.low = 72; // 4.0 mmol/L
+                thresholds.high = 180; // 10.0 mmol/L
+            } else {
+                thresholds.low = 70;
+                thresholds.high = 180;
+            }
+            config.set('thresholds', thresholds);
+
+            updateThresholdsUI(newUnits);
+        });
+
+        // Initial UI setup
+        updateThresholdsUI(currentUnits);
+
+        // Connect threshold change events
+        lowRow.connect('changed', () => {
+            let thresholds = config.get('thresholds');
+            const isMmol = config.get('units') === 'mmol/L';
+            thresholds.low = isMmol ? Math.round(lowRow.value * 18) : lowRow.value;
+            config.set('thresholds', thresholds);
+        });
+        highRow.connect('changed', () => {
+            let thresholds = config.get('thresholds');
+            const isMmol = config.get('units') === 'mmol/L';
+            thresholds.high = isMmol ? Math.round(highRow.value * 18) : highRow.value;
+            config.set('thresholds', thresholds);
+        });
 
         // Stale data timeout
         const staleRow = new Adw.SpinRow({
