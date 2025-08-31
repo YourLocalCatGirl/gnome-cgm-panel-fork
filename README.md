@@ -10,7 +10,7 @@ Monitor your blood glucose levels directly from the Gnome Shell panel with suppo
 - **Smart alerts** for high/low glucose levels
 - **Time in Range** statistics
 - **Trend arrows** showing glucose direction
-- **Flexible units** - switch between mg/dL and mmol/L
+
 - **Customizable thresholds** and colors
 - **Auto-refresh** with configurable intervals
 

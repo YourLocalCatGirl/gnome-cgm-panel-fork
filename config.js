@@ -26,9 +26,17 @@ export class Config {
                 const defaultConfig = this._getDefaultConfig();
                 const userConfig = JSON.parse(configText);
 
+                const mergedConfig = { ...defaultConfig, ...userConfig };
+
+                // If units are in mmol/L, convert thresholds to mg/dL for internal use
+                if (mergedConfig.units === 'mmol/L') {
+                    mergedConfig.thresholds.low = Math.round(mergedConfig.thresholds.low * 18);
+                    mergedConfig.thresholds.high = Math.round(mergedConfig.thresholds.high * 18);
+                }
+
                 // Deep merge for nested objects to preserve old settings
                 if (userConfig.thresholds) {
-                    userConfig.thresholds = { ...defaultConfig.thresholds, ...userConfig.thresholds };
+                    mergedConfig.thresholds = { ...defaultConfig.thresholds, ...mergedConfig.thresholds };
                 }
                 if (userConfig.notifications) {
                     userConfig.notifications = { ...defaultConfig.notifications, ...userConfig.notifications };
@@ -52,11 +60,11 @@ export class Config {
             // Provider selection
             provider: "nightscout", // "nightscout" or "librelink"
             
-            // Nightscout config (existing)
+            // Nightscout config
             nightscoutUrl: "",
             apiToken: "",
             
-            // LibreLink config (new)
+            // LibreLink config
             librelink: {
                 email: "",
                 password: "",
@@ -64,13 +72,12 @@ export class Config {
                 patientId: "" // auto-detected after first login
             },
             
-            // Rest of existing config unchanged
-            units: "mmol/L",
             graphHours: 6,
             debug: false,
+            units: "mg/dL", // "mg/dL" or "mmol/L"
             thresholds: {
-                low: 4.0,        // mmol/L - below this is low
-                high: 10.0,      // mmol/L - above this is high
+                low: 70,
+                high: 180,
             },
             notifications: {
                 enabled: true,
@@ -107,6 +114,14 @@ export class Config {
     }
 
     _saveConfig(configObject) {
+        let configToSave = JSON.parse(JSON.stringify(configObject)); // Deep copy
+
+        // If units are in mmol/L, convert thresholds back for saving
+        if (configToSave.units === 'mmol/L') {
+            configToSave.thresholds.low = (configToSave.thresholds.low / 18).toFixed(1);
+            configToSave.thresholds.high = (configToSave.thresholds.high / 18).toFixed(1);
+        }
+
         try {
             const dir = Gio.File.new_for_path(this.configDir);
             if (!dir.query_exists(null)) {
@@ -114,7 +129,7 @@ export class Config {
             }
 
             const file = Gio.File.new_for_path(this.configFile);
-            const configJson = JSON.stringify(configObject, null, 2);
+            const configJson = JSON.stringify(configToSave, null, 2);
             file.replace_contents(configJson, null, false, Gio.FileCreateFlags.NONE, null);
         } catch (error) {
             console.error('Error saving CGM config:', error);

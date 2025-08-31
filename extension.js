@@ -150,13 +150,12 @@ class MyExtension extends PanelMenu.Button {
     }
     
     _initializeConfig() {
-        this._debugEnabled = this._config.get('debug');
+        this._debugEnabled = this._config.get('debug') || false; // Change: add || false
         this._log('Initializing config...');
 
         // Nightscout config from file
         this._nightscoutUrl = this._config.get('nightscoutUrl');
         this._token = this._config.get('apiToken');
-        this._units = this._config.get('units') || 'mmol/L';
         this._graphHours = this._config.get('graphHours') || 6;
         this._cgmInterval = CONSTANTS.DEFAULT_CGM_INTERVAL;
         this._historyFetchInterval = this._config.get('historyFetchInterval') || 10;
@@ -174,22 +173,6 @@ class MyExtension extends PanelMenu.Button {
         }
     }
     
-    _hasEnoughDataForTimeWindow(hours) {
-        if (!this._rawHistoryEntries || this._rawHistoryEntries.length === 0) {
-            return false;
-        }
-        // Check the actual time span of our data
-        const entries = this._rawHistoryEntries;
-        const newestTime = new Date(entries[0].dateString || entries[0].date);
-        const oldestTime = new Date(entries[entries.length - 1].dateString || entries[entries.length - 1].date);
-        const dataSpanHours = (newestTime - oldestTime) / (1000 * 60 * 60);
-        
-        console.log(`Data span check: have ${dataSpanHours.toFixed(1)}h of data, need ${hours}h`);
-        
-        // We have enough if our data spans at least the requested hours + small buffer
-        return dataSpanHours >= (hours * 0.9); // 90% of requested time is sufficient
-    }
-      
     _createPanelButton() {
         this._label = new St.Label({
             text: `${CONSTANTS.PANEL_LABEL_PREFIX}--`,
@@ -229,16 +212,9 @@ class MyExtension extends PanelMenu.Button {
     _createGraph() {
         let thresholds = this._config.get('thresholds');
         let colors = this._config.get('colors');
+        let units = this._config.get('units');
         
-        // Convert thresholds to user's units for the graph
-        if (this._units === 'mg/dL') {
-            thresholds = {
-                low: thresholds.low * 18,
-                high: thresholds.high * 18,
-            };
-        }
-        
-        this._graph = new CGMGraph(320, 180, thresholds, this._graphHours, colors, this._log.bind(this));
+        this._graph = new CGMGraph(320, 180, thresholds, this._graphHours, colors, units, this._log.bind(this));
     }
     
     _setupEventHandlers() {
@@ -282,13 +258,6 @@ class MyExtension extends PanelMenu.Button {
             return GLib.SOURCE_REMOVE;
         });
     }
-    
-    _hasRecentHistoryCache() {
-        const now = new Date().getTime();
-        const CACHE_VALIDITY_MS = this._historyFetchInterval * 60 * 1000;
-        return this._historyCache.data && (now - this._historyCache.timestamp < CACHE_VALIDITY_MS);
-    }
-    
    
     _reloadConfig() {
         if (this._isDestroyed) return;
@@ -297,14 +266,25 @@ class MyExtension extends PanelMenu.Button {
         const oldUrl = this._nightscoutUrl;
         const oldToken = this._token;
         const oldProvider = this._config.get('provider') || 'nightscout';
+        const oldUnits = this._config.get('units') || 'mg/dL';
         
         this._config.reload();
         this._debugEnabled = this._config.get('debug');
         this._initializeConfig();
         
         const newProvider = this._config.get('provider') || 'nightscout';
+        const newUnits = this._config.get('units') || 'mg/dL';
         const providerChanged = (oldProvider !== newProvider);
         const urlOrCredentialsChanged = (oldUrl !== this._nightscoutUrl || oldToken !== this._token);
+        const unitsChanged = (oldUnits !== newUnits);
+
+        if (this._graph) {
+            this._graph.setThresholds(this._config.get('thresholds'));
+            this._graph.setColors(this._config.get('colors'));
+            if (unitsChanged) {
+                this._graph.setUnits(newUnits);
+            }
+        }
         
         // If provider changed, destroy old one and create new one
         if (providerChanged) {
@@ -325,6 +305,9 @@ class MyExtension extends PanelMenu.Button {
             this._inMemoryCache = {};
             this._fetchBG();
             this._fetchHistory();
+        } else if (unitsChanged) {
+            // If only units changed, just update the display
+            this._updateBGDisplay();
         }
     }
 
@@ -462,7 +445,7 @@ class MyExtension extends PanelMenu.Button {
         this._historyData = filteredEntries
             .map(entry => {
                 try {
-                    let value = (this._units === 'mmol/L') ? parseFloat((entry.sgv / 18).toFixed(1)) : entry.sgv;
+                    let value = entry.sgv; // Keep as mg/dL
                     let time = new Date(entry.dateString || entry.date);
                     if (isNaN(value) || value <= 0 || isNaN(time.getTime())) return null;
                     return { time: time, value: value };
@@ -474,19 +457,20 @@ class MyExtension extends PanelMenu.Button {
             .filter(entry => entry !== null);
         
         this._log(`Processed ${this._historyData.length} valid history entries for ${this._graphHours}h window`);
+        
         this._graph.setData(this._historyData);
         this._updateTimeInRange();
     }
-    
+
     _updateHistory(entries) {
         if (!entries || !Array.isArray(entries)) {
             this._log('Invalid history data received');
             return;
         }
-        
+
         this._rawHistoryEntries = entries;
         this._cgmInterval = this._provider.getCgmInterval();
-        
+
         // Save to on-disk cache
         const cachedData = this._cache.load() || {};
         cachedData.history = entries;
@@ -494,7 +478,7 @@ class MyExtension extends PanelMenu.Button {
 
         this._reprocessHistory();
     }
-    
+
     _updateBG(entry) {
         if (!entry || typeof entry.sgv !== 'number' || entry.sgv <= 0) {
             this._log('Invalid BG entry received');
@@ -502,7 +486,7 @@ class MyExtension extends PanelMenu.Button {
         }
         
         const oldBG = this._currentBG;
-        this._currentBG = (entry.sgv / 18).toFixed(1); // Always store as mmol/L
+        this._currentBG = entry.sgv;
         this._lastUpdate = new Date(entry.dateString || entry.date);
         
         if (isNaN(this._lastUpdate.getTime())) this._lastUpdate = new Date();
@@ -524,11 +508,12 @@ class MyExtension extends PanelMenu.Button {
         let trendArrow = this._calculateTrend();
         let delta = this._calculateDelta();
         let deltaText = this._formatDelta(delta);
+        const units = this._config.get('units') || 'mg/dL';
         
         this._label.set_text(`${CONSTANTS.PANEL_LABEL_PREFIX}${displayValue}${trendArrow ? ' ' + trendArrow : ''}`);
         
         if (this._bgLabel) {
-            this._bgLabel.set_text(`${displayValue} ${this._units}${trendArrow ? ' ' + trendArrow : ''}`);
+            this._bgLabel.set_text(`${displayValue} ${units}${trendArrow ? ' ' + trendArrow : ''}`);
         }
         if (this._timeLabel && this._lastUpdate) {
             this._timeLabel.set_text(`Updated: ${this._lastUpdate.toLocaleTimeString([], { hourCycle: 'h23' })}`);
@@ -546,7 +531,12 @@ class MyExtension extends PanelMenu.Button {
     
     _getDisplayValue() {
         if (!this._currentBG) return '--';
-        return (this._units === 'mg/dL') ? Math.round(parseFloat(this._currentBG) * 18).toString() : this._currentBG;
+        
+        const units = this._config.get('units');
+        if (units === 'mmol/L') {
+            return (this._currentBG / 18).toFixed(1);
+        }
+        return this._currentBG.toString();
     }
     
     _updateColors() {
@@ -564,15 +554,14 @@ class MyExtension extends PanelMenu.Button {
             return;
         }
         
-        let bg = parseFloat(this._currentBG);
         let thresholds = this._config.get('thresholds');
         let colors = this._config.get('colors');
         
-        if (bg < thresholds.low) this._setLabelColor(colors.low);
-        else if (bg > thresholds.high) this._setLabelColor(colors.high);
+        if (this._currentBG < thresholds.low) this._setLabelColor(colors.low);
+        else if (this._currentBG > thresholds.high) this._setLabelColor(colors.high);
         else this._setLabelColor(colors.normal);
     }
-    
+
     _calculateTrend() {
         if (!this._rawHistoryEntries || this._rawHistoryEntries.length < 2) return '';
         
@@ -610,16 +599,16 @@ class MyExtension extends PanelMenu.Button {
         if (!notifications.enabled) return;
 
         const thresholds = this._config.get('thresholds');
-        const bg = parseFloat(newBG);
+        const units = this._config.get('units') || 'mg/dL';
         let currentState = 'normal';
         let message = '';
 
-        if (bg < thresholds.low) {
+        if (newBG < thresholds.low) {
             currentState = 'low';
-            if (notifications.low) message = `Low Glucose: ${this._getDisplayValue()} ${this._units}`;
-        } else if (bg > thresholds.high) {
+            if (notifications.low) message = `Low Glucose: ${this._getDisplayValue()} ${units}`;
+        } else if (newBG > thresholds.high) {
             currentState = 'high';
-            if (notifications.high) message = `High Glucose: ${this._getDisplayValue()} ${this._units}`;
+            if (notifications.high) message = `High Glucose: ${this._getDisplayValue()} ${units}`;
         }
 
         // Send notification only when state changes to low/high
@@ -641,12 +630,15 @@ class MyExtension extends PanelMenu.Button {
 
         const thresholds = this._config.get('thresholds');
         const total = this._historyData.length;
-        const inRange = this._historyData.filter(d => d.value >= thresholds.low && d.value <= thresholds.high).length;
+        
+        const inRange = this._historyData.filter(d => 
+            d.value >= thresholds.low && d.value <= thresholds.high
+        ).length;
         
         const percentage = total > 0 ? Math.round((inRange / total) * 100) : 0;
         this._tirLabel.set_text(`Time in Range: ${percentage}%`);
     }
-    
+
     destroy() {
         this._log('Destroying CGM extension...');
         this._isDestroyed = true;
@@ -707,7 +699,7 @@ class MyExtension extends PanelMenu.Button {
         
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         
-        this._bgLabel = new St.Label({ text: `-- ${this._units}`, style: 'font-size: 18px; font-weight: bold; text-align: center;' });
+        this._bgLabel = new St.Label({ text: '-- mg/dL', style: 'font-size: 18px; font-weight: bold; text-align: center;' });
         const bgLabelItem = new PopupMenu.PopupBaseMenuItem({ reactive: false });
         bgLabelItem.add_child(this._bgLabel);
         this.menu.addMenuItem(bgLabelItem);
@@ -769,29 +761,24 @@ class MyExtension extends PanelMenu.Button {
         
         let deltaValue = newest.sgv - comparison.sgv;
         
-        // Convert to user's preferred units
-        if (this._units === 'mmol/L') {
-            deltaValue = deltaValue / 18;
-        }
-        
         return {
             value: deltaValue,
             minutes: Math.round((newestTime - new Date(comparison.dateString || comparison.date)) / (1000 * 60))
         };
     }
-    
+
     _formatDelta(delta) {
         if (!delta) return '';
         
-        let sign = delta.value >= 0 ? '+' : '';
-        let value = Math.abs(delta.value);
-        let formattedValue;
-        
-        if (this._units === 'mmol/L') {
-            formattedValue = value.toFixed(1);
-        } else {
-            formattedValue = Math.round(value).toString();
+        const units = this._config.get('units');
+        let value = delta.value;
+
+        if (units === 'mmol/L') {
+            value = (value / 18);
         }
+
+        let sign = value >= 0 ? '+' : '';
+        let formattedValue = units === 'mmol/L' ? value.toFixed(1) : Math.round(value).toString();
         
         return `${sign}${formattedValue} (${delta.minutes}min)`;
     }
