@@ -714,7 +714,7 @@ class MyExtension extends PanelMenu.Button {
         tirLabelItem.add_child(this._tirLabel);
         this.menu.addMenuItem(tirLabelItem);
         
-        this._timeLabel = new St.Label({ text: 'Never updated', style: 'font-size: 12px; color: #888; text-align: center;' });
+        this._timeLabel = new St.Label({ text: 'Never updated', style: 'font-size: 12px; color: #ccc; text-align: center;' });
         const timeLabelItem = new PopupMenu.PopupBaseMenuItem({ reactive: false });
         timeLabelItem.add_child(this._timeLabel);
         this.menu.addMenuItem(timeLabelItem);
