@@ -26,13 +26,13 @@ Monitor your blood glucose levels directly from the Gnome Shell panel with suppo
 ### Manual Installation
 1. Clone this repository:
    ```bash
-   git clone https://github.com/bramgn/gnome-cgm-panel.git
-   cd gnome-cgm-panel
+   git clone https://github.com/bramgn/cgm-panel-widget.git
+   cd cgm-panel-widget
    ```
 
 2. Copy to your extensions directory:
    ```bash
-   cp -r . ~/.local/share/gnome-shell/extensions/gnome-cgm-panel@bramgn/
+   cp -r . ~/.local/share/gnome-shell/extensions/cgm-panel-widget@bramgn/
    ```
 
 3. Restart GNOME Shell:
@@ -41,7 +41,7 @@ Monitor your blood glucose levels directly from the Gnome Shell panel with suppo
 
 4. Enable the extension:
    ```bash
-   gnome-extensions enable gnome-cgm-panel@bramgn
+   gnome-extensions enable cgm-panel-widget@bramgn
    ```
 
 ## Configuration
@@ -87,8 +87,8 @@ Monitor your blood glucose levels directly from the Gnome Shell panel with suppo
 
 ### Building from Source
 ```bash
-git clone https://github.com/bramgn/gnome-cgm-panel.git
-cd gnome-cgm-panel
+git clone https://github.com/bramgn/cgm-panel-widget.git
+cd cgm-panel-widget
 # No build process required - it's pure JavaScript
 ```
 
@@ -116,8 +116,8 @@ This extension is not a medical device and should not be used as the sole basis 
 
 ## Support
 
-- Report bugs: [GitHub Issues](https://github.com/bramgn/gnome-cgm-panel/issues)
-- Feature requests: [GitHub Discussions](https://github.com/bramgn/gnome-cgm-panel/discussions)
+- Report bugs: [GitHub Issues](https://github.com/bramgn/cgm-panel-widget/issues)
+- Feature requests: [GitHub Discussions](https://github.com/bramgn/cgm-panel-widget/discussions)
 
 ## Acknowledgments
 
