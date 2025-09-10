@@ -516,7 +516,7 @@ class MyExtension extends PanelMenu.Button {
             this._bgLabel.set_text(`${displayValue} ${units}${trendArrow ? ' ' + trendArrow : ''}`);
         }
         if (this._timeLabel && this._lastUpdate) {
-            this._timeLabel.set_text(`Updated: ${this._lastUpdate.toLocaleTimeString([], { hourCycle: 'h23' })}`);
+            this._timeLabel.set_text(`Updated: ${this._formatTimeAgo(this._lastUpdate)}`);
         }
 
         if (this._deltaLabel) {
@@ -781,6 +781,46 @@ class MyExtension extends PanelMenu.Button {
         let formattedValue = units === 'mmol/L' ? value.toFixed(1) : Math.round(value).toString();
         
         return `${sign}${formattedValue} (${delta.minutes}min)`;
+    }
+
+    _formatTimeAgo(date) {
+        if (!date) return 'never';
+
+        const now = new Date();
+        const seconds = Math.floor((now - date) / 1000);
+
+        if (seconds < 60) {
+            return "less than 1 minute ago";
+        }
+
+        const hours = seconds / 3600;
+        if (hours > 12) {
+            return "more than 12 hours ago";
+        }
+
+        let interval = seconds / 31536000;
+        if (interval > 1) {
+            return Math.floor(interval) + "y ago";
+        }
+        interval = seconds / 2592000;
+        if (interval > 1) {
+            return Math.floor(interval) + "mo ago";
+        }
+        interval = seconds / 86400;
+        if (interval > 1) {
+            return Math.floor(interval) + "d ago";
+        }
+        interval = seconds / 3600;
+        if (interval > 1) {
+            const hours = Math.floor(interval);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            return `${hours}h${minutes > 0 ? `${minutes}m` : ''} ago`;
+        }
+        interval = seconds / 60;
+        if (interval > 1) {
+            return Math.floor(interval) + "m ago";
+        }
+        return "less than 1 minute ago";
     }
 });
 
