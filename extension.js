@@ -20,7 +20,7 @@ const CONSTANTS = {
     FETCH_INTERVAL_MIN: 30, // seconds
     DEFAULT_CGM_INTERVAL: 1, // minutes
     INITIAL_HISTORY_FETCH_HOURS: 50,
-    PANEL_LABEL_PREFIX: 'BS: ',
+    PANEL_LABEL_PREFIX: '',
     TREND_ARROWS: {
         RAPID_RISE: '↗↗',
         MODERATE_RISE: '↗',
@@ -833,7 +833,12 @@ export default class CGMWidgetExtension extends Extension {
     enable() {
         console.log('Enabling CGM extension...');
         this.extension = new MyExtension();
-        Main.panel.addToStatusArea('nightscout-cgm', this.extension);
+        Main.panel.addToStatusArea(
+            'nightscout-cgm', 
+            this.extension,
+            0, // priority
+            'center' // put it in to center
+        );
         console.log('CGM extension enabled successfully');
     }
     
