@@ -22,12 +22,12 @@ const CONSTANTS = {
     INITIAL_HISTORY_FETCH_HOURS: 50,
     PANEL_LABEL_PREFIX: '',
     TREND_ARROWS: {
-        RAPID_RISE: '↗↗',
-        MODERATE_RISE: '↗',
-        STABLE: '→',
-        MODERATE_FALL: '↘',
-        RAPID_FALL: '↘↘',
-        VERY_RAPID_FALL: '↓',
+        RAPID_RISE: '🢅🢅',
+        MODERATE_RISE: '🢅',
+        STABLE: '🢂',
+        MODERATE_FALL: '🢆',
+        RAPID_FALL: '🢆🢆',
+        VERY_RAPID_FALL: '🢃',
     },
     TREND_THRESHOLDS: { // In mg/dL per minute
         RAPID_RISE: 2.5,
@@ -837,7 +837,7 @@ export default class CGMWidgetExtension extends Extension {
             'nightscout-cgm', 
             this.extension,
             0, // priority
-            'center' // put it in to center
+            'left' // put it in to center
         );
         console.log('CGM extension enabled successfully');
     }

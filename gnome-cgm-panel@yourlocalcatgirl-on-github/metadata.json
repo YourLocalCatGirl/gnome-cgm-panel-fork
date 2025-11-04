@@ -1,0 +1,9 @@
+{
+  "uuid": "gnome-cgm-panel@yourlocalcatgirl-on-github",
+  "name": "CGM panel widget fork",
+  "description": "CGM glucose monitor with real-time display and historical graph",
+  "shell-version": ["47", "48", "49"],
+  "version": 2,
+  "url": "https://github.com/YourLocalCatGirl/gnome-cgm-panel-fork",
+  "settings-schema": ""
+}
